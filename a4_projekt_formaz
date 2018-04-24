@@ -1,0 +1,91 @@
+Sub projekt_formaz()
+
+    Application.DisplayAlerts = False
+    Application.AskToUpdateLinks = False
+    
+
+    Call turbo_be
+        
+        Call kapott_fajlok_listaz
+        Call pr_formaz
+        
+    Call turbo_ki
+    
+    Application.DisplayAlerts = True
+    Application.AskToUpdateLinks = True
+    
+End Sub
+
+Sub kapott_fajlok_listaz()
+Dim f As String
+Dim sor As Long
+
+'az a cél, hogy a megadott mappákba lementett fájlok neveit kilistázza az általunk megadott helyre -> Master fájl mappák fülének G oszlopába
+
+''meghívja a projektben definiált és beállított változókat
+Call declare_variables
+
+Workbooks(master).Activate
+'Sheets.Add.Name = "pr_lista"
+
+Sheets("pr_lista").Select
+
+ChDir (pr_mappa)
+
+f = Dir(pr_mappa & "\*")
+sor = 1
+
+    While f <> ""
+        Workbooks(master).Sheets("pr_lista").Range("A" & sor).Value = f
+        sor = sor + 1
+        f = Dir()
+    Wend
+    
+''ok_KZS 2018.03.01.
+
+End Sub
+
+Sub pr_formaz()
+
+''meghívja a projektben definiált és beállított változókat
+Call declare_variables
+
+'Kilistázás után menjen végig minden fájlon, amely listázásra került, nyissa meg őket,
+'jelölje ki az összes cellát, formázza meg számformátumra, mentse, majd csukja be a fájlt.
+Dim akt_prf As String
+Dim s As Integer
+
+
+
+s = 1
+akt_prf = Workbooks(master).Sheets("pr_lista").Range("A" & s).Value
+
+
+    While akt_prf <> ""
+        '1. lépjen be a projektfájlokat tartalmazó mappába
+            ChDir (pr_mappa)
+            
+        '2. Nyissa meg a Projekt Master fájl "Fájlok" fülön található A1-es cellában leírt nevű fájlt
+             Workbooks.Open Filename:=pr_mappa & "\" & akt_prf
+            
+        '3. formázza meg a fájlt
+        
+            Cells.Select
+            Selection.NumberFormat = "#,##0"
+        
+        '4. Mentse, majd zárja be a fájlt.
+        
+            Workbooks(akt_prf).Save
+            Workbooks(akt_prf).Close
+            
+        '5. ugorjon a következő fájlnévre, és végezze el a műveletsort újra
+            s = s + 1
+
+        '6. Definiálja a következő fájl nevét
+        
+            akt_prf = Workbooks(master).Sheets("pr_lista").Range("A" & s).Value
+        
+    Wend
+
+End Sub
+
