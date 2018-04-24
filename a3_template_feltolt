@@ -1,0 +1,1422 @@
+Sub a1_foprog_egyezteto_fajl() 'Egyeztető fájl létrehoz
+
+''meghívja a projektben definiált és beállított változókat
+Call declare_variables
+
+
+    Application.DisplayAlerts = False
+    Application.AskToUpdateLinks = False
+    
+
+    Call turbo_be
+        'ide illeszthetőek a főprogram további részei
+  
+        Call pq_act_masol_tabla
+        Call pq_kh_masol_tabla
+        Call act_aktho
+        Call kh_aktho
+        Call bevetelek_kepletez
+        Call koltseg_kepletez
+        Call fno_fk_kepletez
+        Call berek1
+        Call berek_HRadatsorra
+        Call hr_bekepletez
+        Call kieg_jut
+        Call kieg_jut_bekepletez
+        Call lelt_gyart_masol
+        Call lelt_pivot
+        Call gyartas_pivot
+        Call lelt_gyart_keplet
+        Call extrapol
+        Call fulek_elrejt
+        Call alapadatok_atir
+    
+    Call turbo_ki
+    
+    Application.DisplayAlerts = True
+    Application.AskToUpdateLinks = True
+
+
+End Sub
+
+Sub pq_act_masol_tabla()
+'
+' pq_act_masol_tabla Makró
+'' ez azt jelenti, hogy a power query-ben lekérdezett adatokat kijelöljük, és átmásoljuk
+'' egy másik munkalapra, ahol érték-számbeillesztünk, majd újraformázzuk táblázatként
+'' végül megnyitjuk a template-fájlt, és bemásoljuk rá az actual-fájlt, és elmentjük
+'' aktuális havi jelentésként
+
+
+''meghívja a projektben definiált és beállított változókat
+Call declare_variables
+
+    Workbooks(master).Activate
+    Sheets("Actual").Select
+    Range("Actual_lekerd_vegl[[#Headers],[Forrás.Név]]").Select
+    Range(Selection, Selection.End(xlToRight)).Select
+    Range(Selection, Selection.End(xlDown)).Select
+    
+    Selection.Copy
+    Sheets.Add.Name = munkalap2
+    ActiveSheet.Paste
+        Selection.PasteSpecial Paste:=xlPasteValuesAndNumberFormats, Operation:= _
+        xlNone, SkipBlanks:=False, Transpose:=False
+
+    Application.CutCopyMode = False
+    ActiveSheet.ListObjects.Add(xlSrcRange, Selection, , xlYes).Name = _
+        tablazat_act
+    Range(tablazat_act & "[#All]").Select
+    ActiveSheet.ListObjects(tablazat_act).TableStyle = "TableStyleMedium7"
+    ActiveSheet.ListObjects(tablazat_act).Name = tablazat_act2
+     
+    Workbooks.Open Filename:=master_utv & "\" & template
+
+    Windows(master).Activate
+    Sheets(munkalap2).Copy After:=Workbooks( _
+        template).Sheets("Adatsorok")
+    
+    ActiveWorkbook.SaveAs Filename:=targyho_mappa & "\" & fname
+    Workbooks(master).Activate
+    Sheets(munkalap2).Delete
+
+    
+''ok_KZS 2018.02.28
+
+End Sub
+
+
+Sub pq_kh_masol_tabla()
+'
+' pq_kh_masol_tabla Makró
+'
+
+''meghívja a projektben definiált és beállított változókat
+Call declare_variables
+
+    Workbooks(master).Activate
+    Sheets(KH_58).Select
+    Selection.Copy
+    Sheets(KH_58).Copy After:=Workbooks( _
+        fname).Sheets("Adatsorok")
+
+''ok_KZS 2018.02.28
+
+End Sub
+
+Sub act_aktho()
+'
+' act_aktho Makró
+'
+''act_1-x hó pivot fült itt készítjük el
+
+''meghívja a projektben definiált és beállított változókat
+Call declare_variables
+    
+
+Dim PT As PivotTable
+Dim ptcache As PivotCache
+
+Windows(fname).Activate
+
+Sheets.Add.Name = act_munkalap
+
+    Set ptcache = ActiveWorkbook.PivotCaches.Create(xlDatabase, tablazat_act2)
+    Set PT = ActiveSheet.PivotTables.Add(PivotCache:=ptcache, TableDestination:=Sheets(act_munkalap).Range("A3"))
+    PT.Name = act_pivot
+    
+    With PT
+        .ColumnGrand = True
+        .HasAutoFormat = True
+        .DisplayErrorString = False
+        .DisplayNullString = True
+        .EnableDrilldown = True
+        .ErrorString = ""
+        .MergeLabels = False
+        .NullString = ""
+        .PageFieldOrder = 2
+        .PageFieldWrapCount = 0
+        .PreserveFormatting = True
+        .RowGrand = True
+        .SaveData = True
+        .PrintTitles = False
+        .RepeatItemsOnEachPrintedPage = True
+        .TotalsAnnotation = False
+        .CompactRowIndent = 1
+        .InGridDropZones = False
+        .DisplayFieldCaptions = True
+        .DisplayMemberPropertyTooltips = False
+        .DisplayContextTooltips = True
+        .ShowDrillIndicators = True
+        .PrintDrillIndicators = False
+        .AllowMultipleFilters = False
+        .SortUsingCustomLists = True
+        .FieldListSortAscending = False
+        .ShowValuesRow = False
+        .CalculatedMembersInFilters = False
+        .RowAxisLayout xlCompactRow
+    End With
+    With ptcache
+        .RefreshOnFileOpen = False
+        .MissingItemsLimit = xlMissingItemsDefault
+    End With
+    PT.RepeatAllLabels xlRepeatLabels
+    With PT.PivotFields("üzletág")
+        .Orientation = xlRowField
+        .Position = 1
+    End With
+    PT.AddDataField PT.PivotFields("Árbevétel"), "Összeg / Árbevétel", xlSum
+    PT.AddDataField PT.PivotFields("Költség"), "Mennyiség / Költség", xlCount
+    With PT.PivotFields("Mennyiség / Költség")
+        .Caption = "Összeg / Költség"
+        .Function = xlSum
+    End With
+    With PT.PivotFields("Year")
+        .Orientation = xlPageField
+        .Position = 1
+    End With
+    With PT.PivotFields("Month")
+        .Orientation = xlColumnField
+        .Position = 2
+    End With
+    PT.PivotFields("Year").ClearAllFilters
+    PT.PivotFields("Year").CurrentPage = "2018"
+    With PT.PivotFields("Összeg / Árbevétel")
+        .NumberFormat = "# ##0"
+    End With
+    With PT.PivotFields("Összeg / Költség")
+        .NumberFormat = "# ##0"
+    End With
+    Sheets(act_munkalap).Select
+    With ActiveWorkbook.Sheets(act_munkalap).Tab
+        .Color = 12611584
+        .TintAndShade = 0
+    End With
+    
+''ok_KZS 2018.03.01
+
+End Sub
+Sub kh_aktho()
+'
+' kh_aktho Makró
+''itt készítjük el az aktuális havi kh-pivot-ot
+
+'
+
+''meghívja a projektben definiált és beállított változókat
+Call declare_variables
+
+Dim PT As PivotTable
+Dim ptcache As PivotCache
+
+        Windows(fname).Activate
+        Sheets.Add.Name = kh_munkalap
+
+    Set ptcache = ActiveWorkbook.PivotCaches.Create(xlDatabase, KH_tablazat)
+    Set PT = ActiveSheet.PivotTables.Add(PivotCache:=ptcache, TableDestination:=Sheets(kh_munkalap).Range("A3"))
+    PT.Name = KH58_pivot
+    
+    With PT
+        .ColumnGrand = True
+        .HasAutoFormat = True
+        .DisplayErrorString = False
+        .DisplayNullString = True
+        .EnableDrilldown = True
+        .ErrorString = ""
+        .MergeLabels = False
+        .NullString = ""
+        .PageFieldOrder = 2
+        .PageFieldWrapCount = 0
+        .PreserveFormatting = True
+        .RowGrand = True
+        .SaveData = True
+        .PrintTitles = False
+        .RepeatItemsOnEachPrintedPage = True
+        .TotalsAnnotation = False
+        .CompactRowIndent = 1
+        .InGridDropZones = False
+        .DisplayFieldCaptions = True
+        .DisplayMemberPropertyTooltips = False
+        .DisplayContextTooltips = True
+        .ShowDrillIndicators = True
+        .PrintDrillIndicators = False
+        .AllowMultipleFilters = False
+        .SortUsingCustomLists = True
+        .FieldListSortAscending = False
+        .ShowValuesRow = False
+        .CalculatedMembersInFilters = False
+        .RowAxisLayout xlCompactRow
+    End With
+    
+    
+    With PT.PivotFields( _
+        "ktsgkat")
+        .Orientation = xlRowField
+        .Position = 1
+    End With
+    With PT.PivotFields("KH-fv")
+        .Orientation = xlColumnField
+        .Position = 1
+    End With
+    With PT.PivotFields("hó")
+        .Orientation = xlColumnField
+        .Position = 1
+    End With
+    With PT.PivotFields("év")
+        .Orientation = xlPageField
+        .Position = 1
+    End With
+    PT.PivotFields("év").ClearAllFilters
+    PT.PivotFields("év").CurrentPage = "2018"
+    PT.AddDataField PT.PivotFields("egyenleg2"), "Összeg / egyenleg2", xlSum
+    With PT.PivotFields("Összeg / egyenleg2")
+        .NumberFormat = "# ##0"
+    End With
+
+    With ActiveWorkbook.Sheets(kh_munkalap).Tab
+        .Color = 12611584
+        .TintAndShade = 0
+    End With
+    
+''ok_KZS 2018.03.01
+
+End Sub
+
+Sub bevetelek_kepletez()
+'
+' bevételek képlezetése Makró
+''itt képletezzük be a bevétel-sorokat
+
+''meghívja a projektben definiált és beállított változókat
+Call declare_variables
+  
+'
+    Windows(fname).Activate
+    Sheets("Adatsorok").Select
+    Range("B3").Select
+    ActiveCell.FormulaR1C1 = _
+        "=+IF(ISERROR(GETPIVOTDATA(""Összeg / ""&RC1,'" & act_munkalap & "'!R3C1,""üzletág"",R2C1,""Month"",R1C)/1000),0,GETPIVOTDATA(""Összeg / ""&RC1,'" & act_munkalap & "'!R3C1,""üzletág"",R2C1,""Month"",R1C)/1000)+'[" & master & "]kézikorr-tábl'!R[0]C[0]"
+    Range("B3").Select
+    Selection.Copy
+    Range(Selection, Selection.Offset(0, akt_ho - 1)).Select
+    ActiveSheet.Paste
+    
+    Range("B19").Select
+    ActiveCell.FormulaR1C1 = _
+        "=+IF(ISERROR(GETPIVOTDATA(""Összeg / ""&RC1,'" & act_munkalap & "'!R3C1,""üzletág"",R18C1,""Month"",R1C)/1000),0,GETPIVOTDATA(""Összeg / ""&RC1,'" & act_munkalap & "'!R3C1,""üzletág"",R18C1,""Month"",R1C)/1000)+'[" & master & "]kézikorr-tábl'!R[0]C[0]"
+    Range("B19").Select
+    Selection.Copy
+    Range(Selection, Selection.Offset(0, akt_ho - 1)).Select
+    ActiveSheet.Paste
+    
+''ok_KZS 2018.03.01
+
+End Sub
+
+Sub koltseg_kepletez()
+'
+' koltseg_kepletez1 Makró
+''itt adjuk meg a két üzletághoz tartozó költségeket
+
+''meghívja a projektben definiált és beállított változókat
+Call declare_variables
+
+    Windows(fname).Activate
+    Application.CutCopyMode = False
+    
+''HM-Anyagköltségtől
+
+    
+    Range("B5").Select
+    ActiveCell.FormulaR1C1 = _
+        "=+IF(ISERROR(GETPIVOTDATA(""Összeg / Költség"",'" & act_munkalap & "'!R3C1,""üzletág"",R2C1,""Month"",R1C)/1000),0,GETPIVOTDATA(""Összeg / Költség"",'" & act_munkalap & "'!R3C1,""üzletág"",R2C1,""Month"",R1C)/1000)+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""HM"")),0,GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""HM""))/1000+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""HM/GY"")*3/4),0,GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""HM/GY"")*3/4)/1000+I" & _
+        "F(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""GY"")/2),0,GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""GY"")/2)/1000+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC" & _
+        "1,""KH-fv"",""H/K"")/2),0,GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""H/K"")/2)/1000+'[" & master & "]kézikorr-tábl'!R[0]C[0]" & _
+        ""
+    Range("B5").Select
+    Selection.Copy
+    Range(Selection, Selection.Offset(0, akt_ho - 1)).Select
+'    Range(Selection, Selection.End(xlDown)).Select
+    ActiveSheet.Paste
+    
+''HM-Humán ef-tól
+
+    Range("B6").Select
+'    Application.CutCopyMode = False
+    ActiveCell.FormulaR1C1 = _
+        "=+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""HM"")),0,GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""HM""))/1000+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1" & _
+        ",""KH-fv"",""HM/GY"")*3/4),0,GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""HM/GY"")*3/4)/1000+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""GY"")/2),0,GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""GY"")/2)/1000+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""H/K"")/2),0,GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""H/K"")/2)/1000+'[" & master & "]kézikorr-tábl'!R[0]C[0]" & _
+        ""
+        
+    Range("B6").Select
+    Selection.Copy
+    Range(Selection, Selection.Offset(0, akt_ho - 1)).Select
+    Range(Selection, Selection.End(xlDown)).Select
+    ActiveSheet.Paste
+    
+    
+''KE-Anyagköltségtől
+
+    Range("B21").Select
+    ActiveWindow.SmallScroll Down:=-6
+    ActiveCell.FormulaR1C1 = _
+        "=+IF(ISERROR(GETPIVOTDATA(""Összeg / Költség"",'" & act_munkalap & "'!R3C1,""üzletág"",R18C1,""Month"",R1C)/1000),0,GETPIVOTDATA(""Összeg / Költség"",'" & act_munkalap & "'!R3C1,""üzletág"",R18C1,""Month"",R1C)/1000)+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""KE"")),0,(GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""KE""))/1000+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""HM/GY"")/4),0,GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""HM/GY"")/4)/100" & _
+        "0+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""H/K"")/2),0,GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""H/K"")/2)/1000+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat" & _
+        """,RC1,""KH-fv"",""GY"")/2),0,GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""GY"")/2)/1000)+'[" & master & "]kézikorr-tábl'!R[0]C[0]" & _
+        ""
+    Range("B21").Select
+     Selection.Copy
+    Range(Selection, Selection.Offset(0, akt_ho - 1)).Select
+'    Range(Selection, Selection.End(xlDown)).Select
+    ActiveSheet.Paste
+  
+''KE-Humán ef-tól
+
+    Range("B22").Select
+    ActiveCell.FormulaR1C1 = _
+        "=+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""KE"")),0,(GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""KE""))/1000+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC" & _
+        "1,""KH-fv"",""HM/GY"")/4),0,GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""HM/GY"")/4)/1000+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""H/K"")/2),0,GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""" & _
+        "ktsgkat"",RC1,""KH-fv"",""H/K"")/2)/1000+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""GY"")/2),0,GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""GY"")/2)/1000)+'[" & master & "]kézikorr-tábl'!R[0]C[0]" & _
+        ""
+    Range("B22").Select
+    Selection.Copy
+    Range(Selection, Selection.Offset(0, akt_ho - 1)).Select
+    Range(Selection, Selection.End(xlDown)).Select
+    ActiveSheet.Paste
+    
+''ok_KZS 2018.03.01
+    
+End Sub
+Sub fno_fk_kepletez()
+'
+' fno_fk_kepletez Makró
+'' itt adjuk meg az fno és fk költségek képleteit
+
+''meghívja a projektben definiált és beállított változókat
+Call declare_variables
+
+'
+    Windows(fname).Activate
+    Range("B37").Select
+    ActiveCell.FormulaR1C1 = _
+        "=+GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",1,""ktsgkat"",""Anyagköltség"",""KH-fv"",""FNO"")+'[" & master & "]kézikorr-tábl'!R[0]C[0]"
+    Range("B37").Select
+    ActiveCell.FormulaR1C1 = _
+        "=+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",R34C1)),0,GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",R34C1))/1000+'[" & master & "]kézikorr-tábl'!R[0]C[0]"
+    Range("B37").Select
+    Selection.Copy
+    Range(Selection, Selection.Offset(0, akt_ho - 1)).Select
+    Range(Selection, Selection.End(xlDown)).Select
+    ActiveSheet.Paste
+    Range("B37").Select
+    Application.CutCopyMode = False
+    Selection.Copy
+    Range("B53").Select
+    ActiveSheet.Paste
+    Application.CutCopyMode = False
+    ActiveCell.FormulaR1C1 = _
+        "=+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",R50C1)),0,GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",R50C1))/1000+'[" & master & "]kézikorr-tábl'!R[53]C[2]"
+    Range("B53").Select
+    Selection.Copy
+    Range(Selection, Selection.Offset(0, akt_ho - 1)).Select
+    Range(Selection, Selection.End(xlDown)).Select
+    ActiveSheet.Paste
+    Range("A1").Select
+   
+''ok_KZS 2018.03.01
+   
+End Sub
+
+
+
+Sub berek1()
+'
+' bérek1 Makró
+'
+
+''meghívja a projektben definiált és beállított változókat
+Call declare_variables
+
+Dim btab As String
+Dim bt_hiv As String
+Dim PT As PivotTable
+Dim PCache As PivotCache
+Dim PCache2 As PivotCache
+Dim PT2 As PivotTable
+Dim kh_pivot_name As String
+Dim kh_tabl As String
+Dim kh_tabl_m As String
+
+
+'berl_fajl = Workbooks("" & master & "").Sheets("Mappák").Range("th_berl").Value
+'berl_mlap = Workbooks("" & master & "").Sheets("Mappák").Range("th_berl_mlap").Value
+btab = "berlista"
+'master = "" & master & ""
+
+
+''Módosítások dokumentálása:
+
+'Dim berl_fajl As String
+'Dim berl_mlap As String
+
+'munkalap = "KH_1-" & akt_ho & "_pivot" ->
+'1. munkalap = kh_munkalap => átállítvam de nem volt a szövegben_KZS 2018.03.01
+'berl_fajl = Workbooks("" & master & "").Sheets("Mappák").Range("th_berl").Value
+'2. berl_fajl = th_berl => átállítva_KZS 2018.03.01
+'berl_mlap = Workbooks("" & master & "").Sheets("Mappák").Range("th_berl_mlap").Value
+'berl_mlap = th_berl_mlap => átállítva_KZS 2018.03.01
+'' 2017 = 2018 => átállítva_KZS 2018.03.01
+    
+    Windows(fname).Activate
+    ChDir th_koka
+    Workbooks.Open Filename:=th_koka & "\" & th_berl
+    Sheets(th_berl_mlap).Range("A1").Select
+    Range(Selection, Selection.End(xlToRight)).Select
+    Range(Selection, Selection.End(xlDown)).Select
+    Application.CutCopyMode = False
+    ActiveSheet.ListObjects.Add(xlSrcRange, Selection, , xlYes).Name = _
+        btab
+    
+    bt_hiv = ActiveSheet.ListObjects(btab)
+    
+    Range(btab & "[#All]").Select
+    ActiveSheet.ListObjects(btab).TableStyle = "TableStyleMedium6"
+    Sheets(th_berl_mlap).Select
+    Sheets(th_berl_mlap).Copy After:=Workbooks(fname).Sheets("Adatsorok")
+    Sheets(th_berl_mlap).Select
+    With ActiveWorkbook.Sheets(th_berl_mlap).Tab
+        .Color = 5296274
+        .TintAndShade = 0
+    End With
+    
+    ber_pivot_m = "ber_1-" & akt_ho & "_pivot"
+    ber_pivot_k = "ber_pivot"
+    
+    Sheets.Add.Name = ber_pivot_m
+    
+    Set PCache = ActiveWorkbook.PivotCaches.Create(xlDatabase, btab)
+    Set PT = ActiveSheet.PivotTables.Add(PivotCache:=PCache, TableDestination:=Sheets(ber_pivot_m).Range("A3"))
+    PT.Name = ber_pivot_k
+    Sheets(ber_pivot_m).Select
+    Cells(3, 1).Select
+    With PT
+        .ColumnGrand = True
+        .HasAutoFormat = True
+        .DisplayErrorString = False
+        .DisplayNullString = True
+        .EnableDrilldown = True
+        .ErrorString = ""
+        .MergeLabels = False
+        .NullString = ""
+        .PageFieldOrder = 2
+        .PageFieldWrapCount = 0
+        .PreserveFormatting = True
+        .RowGrand = True
+        .SaveData = True
+        .PrintTitles = False
+        .RepeatItemsOnEachPrintedPage = True
+        .TotalsAnnotation = False
+        .CompactRowIndent = 1
+        .InGridDropZones = False
+        .DisplayFieldCaptions = True
+        .DisplayMemberPropertyTooltips = False
+        .DisplayContextTooltips = True
+        .ShowDrillIndicators = True
+        .PrintDrillIndicators = False
+        .AllowMultipleFilters = False
+        .SortUsingCustomLists = True
+        .FieldListSortAscending = False
+        .ShowValuesRow = False
+        .CalculatedMembersInFilters = False
+        .RowAxisLayout xlCompactRow
+    End With
+    
+    With PCache
+        .RefreshOnFileOpen = False
+        .MissingItemsLimit = xlMissingItemsDefault
+    End With
+    
+    PT.RepeatAllLabels xlRepeatLabels
+    Sheets(th_berl_mlap).Select
+    
+    Range(btab & "[honev]").Select
+    Selection.ListObject.ListColumns.Add Position:=3
+    Range(btab & "[[#Headers],[Oszlop1]]").Select
+    ActiveCell.FormulaR1C1 = "KH"
+    Range("C2").Select
+    ActiveCell.FormulaR1C1 = _
+        "=+VLOOKUP([@nev]," & master & "!HR_KH[#All],4,FALSE)"
+    Range("C3").Select
+    Sheets(ber_pivot_m).Select
+    With ActiveWorkbook.Sheets(ber_pivot_m).Tab
+        .Color = 12611584
+        .TintAndShade = 0
+    End With
+    
+    Range("A5").Select
+    With PT.PivotFields("ho")
+        .Orientation = xlColumnField
+        .Position = 1
+    End With
+    Range("D4").Select
+    PCache.Refresh
+    With PT.PivotFields("KH")
+        .Orientation = xlRowField
+        .Position = 1
+    End With
+    
+    PT.AddDataField PT.PivotFields("bruttober"), "Összeg / bruttober", xlSum
+    PT.PivotFields("Összeg / bruttober"). _
+        Orientation = xlHidden
+    Sheets(th_berl_mlap).Select
+    Columns("L:L").Select
+    Selection.Insert Shift:=xlToRight, CopyOrigin:=xlFormatFromLeftOrAbove
+    Range(btab & "[[#Headers],[Oszlop1]]").Select
+    ActiveCell.FormulaR1C1 = "szuperbruttó"
+    Range("L2").Select
+    ActiveCell.FormulaR1C1 = "=+[@bruttober]*1.21"
+    
+'' 23.5 %-os munkáltatói járulékok összege összesen 21%-ra csökkentek_KZS 2018.03.01
+
+    Columns("K:L").Select
+    Range(btab & "[[#Headers],[szuperbruttó]]").Activate
+    Selection.NumberFormat = "#,##0"
+    Sheets(ber_pivot_m).Select
+    Range("A3").Select
+    PCache.Refresh
+    PT.AddDataField PT.PivotFields("szuperbruttó"), "Összeg / szuperbruttó", xlSum
+    With PT.PivotFields("Összeg / szuperbruttó" _
+        )
+        .NumberFormat = "# ##0"
+    End With
+    Sheets.Add.Name = "berszorzo"
+    ActiveCell.FormulaR1C1 = "berlista"
+    Range("B1").Select
+    ActiveCell.FormulaR1C1 = "fokonyv"
+    Range("A2").Select
+    ActiveCell.FormulaR1C1 = _
+        "=+GETPIVOTDATA(""szuperbruttó"",'" & ber_pivot_m & "'!R3C1)"
+    Cells.Select
+    Selection.NumberFormat = "#,##0"
+    Range("B2").Select
+    ActiveCell.FormulaR1C1 = ""
+    Range("A6").Select
+    
+''!!! ide be kell hivatkozni a megfelelő ws-et és pivot-táblát!!!
+
+'    kh_tabl = "KH_58_" & akt_ho & "ho"
+
+    kh_tabl_m = "KH_1-" & akt_ho & "_pivot"
+    kh_pivot_name = "kh_ber_pivot"
+    
+    Set PCache2 = ActiveWorkbook.PivotCaches.Create(xlDatabase, tabl_58)
+    Set PT2 = ActiveSheet.PivotTables.Add(PivotCache:=PCache2, TableDestination:=Sheets("berszorzo").Range("A6"))
+    PT2.Name = kh_pivot_name
+    
+    Sheets("berszorzo").Select
+    Cells(6, 1).Select
+    With PT2
+        .ColumnGrand = True
+        .HasAutoFormat = True
+        .DisplayErrorString = False
+        .DisplayNullString = True
+        .EnableDrilldown = True
+        .ErrorString = ""
+        .MergeLabels = False
+        .NullString = ""
+        .PageFieldOrder = 2
+        .PageFieldWrapCount = 0
+        .PreserveFormatting = True
+        .RowGrand = True
+        .SaveData = True
+        .PrintTitles = False
+        .RepeatItemsOnEachPrintedPage = True
+        .TotalsAnnotation = False
+        .CompactRowIndent = 1
+        .InGridDropZones = False
+        .DisplayFieldCaptions = True
+        .DisplayMemberPropertyTooltips = False
+        .DisplayContextTooltips = True
+        .ShowDrillIndicators = True
+        .PrintDrillIndicators = False
+        .AllowMultipleFilters = False
+        .SortUsingCustomLists = True
+        .FieldListSortAscending = False
+        .ShowValuesRow = True
+        .CalculatedMembersInFilters = False
+        .RowAxisLayout xlCompactRow
+    End With
+    With PCache2
+        .RefreshOnFileOpen = False
+        .MissingItemsLimit = xlMissingItemsDefault
+    End With
+    PT2.RepeatAllLabels xlRepeatLabels
+    With PT2.PivotFields("KH-fv")
+        .Orientation = xlRowField
+        .Position = 1
+    End With
+    PT2.AddDataField PT2.PivotFields("egyenleg2"), "Összeg / egyenleg2", xlSum
+    With PT2.PivotFields("Összeg / egyenleg2")
+        .NumberFormat = "# ##0"
+    End With
+    PT2.AddDataField PT2.PivotFields("hó"), "Összeg / hó", xlSum
+    With PT2.PivotFields("Összeg / hó")
+        .Orientation = xlColumnField
+'        .Position = 2
+    End With
+    With PT2.PivotFields("KH-fv")
+        .PivotItems("ACTUAL").Visible = False
+        .PivotItems("FK").Visible = False
+        .PivotItems("FNO").Visible = False
+        .PivotItems("GY").Visible = False
+'        .PivotItems("H/K").Visible = False
+        .PivotItems("HM").Visible = False
+        .PivotItems("HM/GY").Visible = False
+        .PivotItems("KE").Visible = False
+    End With
+    PT2.PivotFields("hó").Orientation = _
+        xlHidden
+    Range("B2").Select
+    Application.CutCopyMode = False
+    ActiveCell.FormulaR1C1 = "=+GETPIVOTDATA(""egyenleg2"",R6C1)"
+    Range("C1").Select
+    ActiveCell.FormulaR1C1 = "szorzó"
+    Range("C2").Select
+    Application.CutCopyMode = False
+    ActiveCell.FormulaR1C1 = "=+RC[-1]/RC[-2]"
+    Range("C2").Select
+    Selection.NumberFormat = "#,##0.0"
+    Selection.NumberFormat = "#,##0.00"
+    ActiveWorkbook.Save
+    Sheets("Adatsorok").Select
+    
+''ok_KZS 2018.03.01
+
+End Sub
+
+
+Sub berek_HRadatsorra()
+'
+' Bérek_HRadatsorra Makró
+'
+''meghívja a projektben definiált és beállított változókat
+Call declare_variables
+
+'
+    Windows(fname).Activate
+    Sheets("HR-adatsorok").Select
+    Range("B3").Select
+    ActiveCell.FormulaR1C1 = _
+        "=+IF(ISERROR(GETPIVOTDATA(""szuperbruttó"",'" & ber_pivot_m & "'!R3C1,""KH"",R[-1]C1,""ho"",R1C)/1000*" & "'berszorzo'!R2C3" & "),0,GETPIVOTDATA(""szuperbruttó"",'" & ber_pivot_m & "'!R3C1,""KH"",R[-1]C1,""ho"",R1C)/1000*" & "'berszorzo'!R2C3" & ")+IF(R[-1]C1=""Hajtómű"",IF(ISERROR(GETPIVOTDATA(""szuperbruttó"",'" & ber_pivot_m & "'!R3C1,""KH"",""GY"",""ho"",R1C)*" & "'berszorzo'!R2C3" & "/2000),0,GETPIVOTDATA(""szuperbruttó"",'" & ber_pivot_m & "'!R3C1,""KH"",""GY"",""ho"",R1C)*" & "'berszorzo'!R2C3" & "/2000),IF(R[-1]C1=""Keverő"",IF(ISERROR(GETPIVOTDATA(""szuperbruttó"",'" & ber_pivot_m & "'!R3C1,""KH"",""GY"",""ho"",R1C)*" & "'berszorzo'!R2C3" & "/2000),0,GETPIVOTDATA(""szuperbruttó"",'" & ber_pivot_m & "'!R3C1,""KH"",""GY"",""ho"",R1C)*" & "'berszorzo'!R2C3" & "/2000),0))" & _
+        ""
+    Range("B3").Select
+    Selection.Copy
+    Range("B3", Range("B3").Offset(0, akt_ho - 1)).Select
+    ActiveSheet.Paste
+    Range("B5", Range("B5").Offset(0, akt_ho - 1)).Select
+    ActiveSheet.Paste
+    Range("B7", Range("B7").Offset(0, akt_ho - 1)).Select
+    ActiveSheet.Paste
+    Range("B9", Range("B9").Offset(0, akt_ho - 1)).Select
+    ActiveSheet.Paste
+    
+''ok_KZS 2018.03.01
+
+End Sub
+
+
+Sub hr_bekepletez()
+'
+' hr_bekepletez Makró
+'
+'munkalap = "KH_1-" & akt_ho & "_pivot"
+'munkalap = kh_munkalap => átállítva_KZS 2018.03.01
+
+''meghívja a projektben definiált és beállított változókat
+Call declare_variables
+
+'
+    Windows(fname).Activate
+    Sheets("Adatsorok").Select
+    Range("B6").Select
+    ActiveCell.FormulaR1C1 = _
+        "=+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""HM"")),0,GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""HM""))/1000+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1" & _
+        ",""KH-fv"",""HM/GY"")*3/4),0,GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""HM/GY"")*3/4)/1000+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""GY"")/2),0,GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""GY"")/2)/1000+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""H/K"")/2),0,GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""H/K"")/2)/1000+'HR-adatsorok'!R[-3]C+'[" & master & "]kézikorr-tábl'!R[0]C[0]" & _
+        ""
+    Range("B22").Select
+    ActiveCell.FormulaR1C1 = _
+        "=+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""KE"")),0,(GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""KE""))/1000+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC" & _
+        "1,""KH-fv"",""HM/GY"")/4),0,GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""HM/GY"")/4)/1000+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""H/K"")/2),0,GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""" & _
+        "ktsgkat"",RC1,""KH-fv"",""H/K"")/2)/1000+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""GY"")/2),0,GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""GY"")/2)/1000)+'HR-adatsorok'!R[-17]C+'[" & master & "]kézikorr-tábl'!R[0]C[0]" & _
+        ""
+    Range("B38").Select
+    ActiveCell.FormulaR1C1 = _
+        "=+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",R34C1)),0,GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",R34C1))/1000+'HR-adatsorok'!R[-31]C+'[" & master & "]kézikorr-tábl'!R[0]C[0]"
+    Range("B54").Select
+    ActiveCell.FormulaR1C1 = _
+        "=+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",R50C1)),0,GETPIVOTDATA(""egyenleg2"",'" & kh_munkalap & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",R50C1))/1000+'HR-adatsorok'!R[-45]C+'[" & master & "]kézikorr-tábl'!R[0]C[0]"
+    Range("B54").Select
+    Selection.Copy
+    Range("B54").Select
+        Range(Selection, Range("B54").Offset(0, akt_ho - 1)).Select
+    ActiveSheet.Paste
+    Range("B38").Select
+    Application.CutCopyMode = False
+    Selection.Copy
+        Range(Selection, Range("B38").Offset(0, akt_ho - 1)).Select
+    ActiveSheet.Paste
+    Range("B22").Select
+    Application.CutCopyMode = False
+    Selection.Copy
+        Range(Selection, Range("B22").Offset(0, akt_ho - 1)).Select
+    ActiveSheet.Paste
+    ActiveWindow.SmallScroll Down:=-21
+    Range("B6").Select
+    Application.CutCopyMode = False
+    Selection.Copy
+        Range(Selection, Range("B6").Offset(0, akt_ho - 1)).Select
+    ActiveSheet.Paste
+    
+''ok_KZS 2018.03.01
+
+End Sub
+
+Sub kieg_jut()
+'
+' kieg_jut Makró
+'
+
+''meghívja a projektben definiált és beállított változókat
+Call declare_variables
+
+Dim kj_alap_munkalap As String
+Dim kieg_jut As String
+Dim kj_mlap As String
+Dim kj_pivot As String
+Dim PT As PivotTable
+Dim PCache As PivotCache
+
+kj_alap_munkalap = "Kieg-jut"
+kieg_jut = "kieg_jut"
+kj_mlap = "kieg-jut_pivot"
+kj_pivot = "kj_pivot"
+
+'
+    Windows(fname).Activate
+    Workbooks.Open Filename:=th_ufka & "\" & kieg_jut_fn
+    
+    Windows(fname).Activate
+    Sheets.Add.Name = kj_alap_munkalap
+
+    Application.CutCopyMode = False
+    ActiveCell.FormulaR1C1 = "Név"
+    Range("B1").Select
+    ActiveCell.FormulaR1C1 = "1"
+    Range("C1").Select
+    ActiveCell.FormulaR1C1 = "2"
+    Range("D1").Select
+    ActiveCell.FormulaR1C1 = "3"
+    Range("B1:D1").Select
+    Selection.AutoFill Destination:=Range("B1:M1"), Type:=xlFillDefault
+    Range("B1:M1").Select
+    Range("B2").Select
+    Sheets(th_berl_mlap).Select
+    Windows(master).Activate
+    Sheets("HR_KHkat_ful").Select
+    Range("HR_KH[Nevek költséghez]").Select
+    Selection.Copy
+    Windows(fname).Activate
+    Sheets(kj_alap_munkalap).Select
+    Range("A2").Select
+        Selection.PasteSpecial Paste:=xlPasteValuesAndNumberFormats, Operation:= _
+        xlNone, SkipBlanks:=False, Transpose:=False
+
+    Columns("A:A").EntireColumn.AutoFit
+    
+    Range("B2").Select
+    Application.CutCopyMode = False
+    
+    Application.Calculation = xlCalculationAutomatic
+    
+    
+    ActiveCell.FormulaR1C1 = _
+        "=+IF(ISERROR(VLOOKUP(RC1,'[" & kieg_jut_fn & "]2018_jutalék'!R4C3:R20C100,(R1C)*4+1,FALSE)),0,VLOOKUP(RC1,'[" & kieg_jut_fn & "]2018_jutalék'!R4C3:R20C100,(R1C)*4+1,FALSE))"
+    
+    Range("B2").Select
+    Selection.Copy
+    Range("B2:M27").Select
+    ActiveSheet.Paste
+'    Selection.PasteSpecial Paste:=xlPasteValuesAndNumberFormats, Operation:= _
+'    xlNone, SkipBlanks:=False, Transpose:=False
+    Selection.NumberFormat = "#,##0"
+        
+    Sheets(kj_alap_munkalap).Select
+    With ActiveWorkbook.Sheets(kj_alap_munkalap).Tab
+        .Color = 5296274
+        .TintAndShade = 0
+    End With
+    
+    Columns("B:B").Select
+    Selection.Insert Shift:=xlToRight, CopyOrigin:=xlFormatFromLeftOrAbove
+    Range("B1").Select
+    ActiveCell.FormulaR1C1 = "KH"
+    Range("B2").Select
+    ActiveCell.FormulaR1C1 = _
+        "=+VLOOKUP(RC[-1]," & master & "!HR_KH[#All],4,FALSE)"
+    Range("B2").Select
+    Selection.Copy
+    Range("A2").Select
+    Selection.End(xlDown).Select
+    Range("B27").Select
+    Range(Selection, Selection.End(xlUp)).Select
+    ActiveSheet.Paste
+            Range("B1").Value = "KH"
+    Range("A1").Select
+    Range(Selection, Selection.End(xlToRight)).Select
+    Range(Selection, Selection.End(xlDown)).Select
+    Application.CutCopyMode = False
+    
+    ActiveSheet.ListObjects.Add(xlSrcRange, Selection, , xlYes).Name = _
+        kieg_jut
+    Range(kieg_jut & "[#All]").Select
+    ActiveSheet.ListObjects(kieg_jut).TableStyle = "TableStyleMedium7"
+    Sheets.Add.Name = kj_mlap
+    
+    
+    Set PCache = ActiveWorkbook.PivotCaches.Create(xlDatabase, kieg_jut)
+    Set PT = ActiveSheet.PivotTables.Add(PivotCache:=PCache, TableDestination:=Sheets(kj_mlap).Range("A3"))
+    PT.Name = kj_pivot
+    
+    Sheets(kj_mlap).Select
+    Cells(3, 1).Select
+    With PT
+        .ColumnGrand = True
+        .HasAutoFormat = True
+        .DisplayErrorString = False
+        .DisplayNullString = True
+        .EnableDrilldown = True
+        .ErrorString = ""
+        .MergeLabels = False
+        .NullString = ""
+        .PageFieldOrder = 2
+        .PageFieldWrapCount = 0
+        .PreserveFormatting = True
+        .RowGrand = True
+        .SaveData = True
+        .PrintTitles = False
+        .RepeatItemsOnEachPrintedPage = True
+        .TotalsAnnotation = False
+        .CompactRowIndent = 1
+        .InGridDropZones = False
+        .DisplayFieldCaptions = True
+        .DisplayMemberPropertyTooltips = False
+        .DisplayContextTooltips = True
+        .ShowDrillIndicators = True
+        .PrintDrillIndicators = False
+        .AllowMultipleFilters = False
+        .SortUsingCustomLists = True
+        .FieldListSortAscending = False
+        .ShowValuesRow = False
+        .CalculatedMembersInFilters = False
+        .RowAxisLayout xlCompactRow
+    End With
+    With PCache
+        .RefreshOnFileOpen = False
+        .MissingItemsLimit = xlMissingItemsDefault
+    End With
+    PT.RepeatAllLabels xlRepeatLabels
+    PT.AddDataField PT.PivotFields("1"), "Összeg / 1", xlSum
+    PT.AddDataField PT.PivotFields("2"), "Összeg / 2", xlSum
+    PT.AddDataField PT.PivotFields("3"), "Összeg / 3", xlSum
+    PT.AddDataField PT.PivotFields("4"), "Összeg / 4", xlSum
+    PT.AddDataField PT.PivotFields("5"), "Összeg / 5", xlSum
+    PT.AddDataField PT.PivotFields("6"), "Összeg / 6", xlSum
+    PT.AddDataField PT.PivotFields("7"), "Összeg / 7", xlSum
+    PT.AddDataField PT.PivotFields("8"), "Összeg / 8", xlSum
+    PT.AddDataField PT.PivotFields("9"), "Összeg / 9", xlSum
+    PT.AddDataField PT.PivotFields("10"), "Összeg / 10", xlSum
+    PT.AddDataField PT.PivotFields("11"), "Összeg / 11", xlSum
+    PT.AddDataField PT.PivotFields("12"), "Összeg / 12", xlSum
+    With PT.PivotFields("KH")
+        .Orientation = xlRowField
+        .Position = 1
+    End With
+     With PCache
+        .RefreshOnFileOpen = True
+        'itt feljebb eredetileg False volt, ha nem működne a kód.
+        .MissingItemsLimit = xlMissingItemsDefault
+    End With
+    Cells.Select
+    Selection.NumberFormat = "#,##0"
+    PT.PivotSelect "KH[All]", xlLabelOnly + _
+        xlFirstRow, True
+
+
+''ok_KZS 2018.03.01
+
+
+End Sub
+
+Sub kieg_jut_bekepletez()
+'
+' kieg_jut_bekepletez Makró
+'
+
+''meghívja a projektben definiált és beállított változókat
+Call declare_variables
+
+Dim kh_pivot As String
+
+kh_pivot = kh_munkalap
+
+'
+    Windows(fname).Activate
+   
+    Sheets("Adatsorok").Select
+    Range("B11").Select
+    
+    ActiveCell.FormulaR1C1 = _
+     "=+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""HM"")),0,GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""HM""))/1000+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""HM/GY"")*3/4),0,GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""" & _
+        "hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""HM/GY"")*3/4)/1000+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""GY"")/2),0,GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""GY"")/2)/1000+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""H/K"")/" & _
+        "2),0,GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""H/K"")/2)/1000+IF(ISERROR((GETPIVOTDATA(""Összeg / ""&Adatsorok!R1C,'kieg-jut_pivot'!R3C1,""KH"",Adatsorok!R[-9]C1)/1000)),0,(GETPIVOTDATA(""Összeg / ""&Adatsorok!R1C,'kieg-jut_pivot'!R3C1,""KH"",Adatsorok!R[-9]C1)/1000))/0.95+IF(ISERROR((GETPIVOTDATA(""Összeg / ""&Adatsorok!R1C,'kieg-jut_pivot'!R3C1,""KH"",""GY"")/2000)),0,(G" & _
+        "ETPIVOTDATA(""Összeg / ""&Adatsorok!R1C,'kieg-jut_pivot'!R3C1,""KH"",""GY"")/2000))/0.95+'[" & master & "]kézikorr-tábl'!R[0]C[0]" & _
+        ""
+    
+    Range("B11").Select
+    Selection.Copy
+    Range(Range("B11"), Range("B11").Offset(0, akt_ho - 1)).Select
+    ActiveSheet.Paste
+    Range("B27").Select
+    ActiveSheet.Paste
+    Range(Range("B27"), Range("B27").Offset(0, akt_ho - 1)).Select
+    ActiveSheet.Paste
+    Range("B43").Select
+    ActiveCell.FormulaR1C1 = _
+     "=+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""HM"")),0,GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""HM""))/1000+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""HM/GY"")*3/4),0,GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""" & _
+        "hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""HM/GY"")*3/4)/1000+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""GY"")/2),0,GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""GY"")/2)/1000+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""H/K"")/" & _
+        "2),0,GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""H/K"")/2)/1000+IF(ISERROR((GETPIVOTDATA(""Összeg / ""&Adatsorok!R1C,'kieg-jut_pivot'!R3C1,""KH"",Adatsorok!R[-9]C1)/1000)),0,(GETPIVOTDATA(""Összeg / ""&Adatsorok!R1C,'kieg-jut_pivot'!R3C1,""KH"",Adatsorok!R[-9]C1)/1000))/0.95+'[" & master & "]kézikorr-tábl'!R[0]C[0]" & _
+        ""
+    Range("B43").Copy
+    Range(Range("B43"), Range("B43").Offset(0, akt_ho - 1)).Select
+    ActiveSheet.Paste
+    
+    Range("B59").Select
+    Application.CutCopyMode = False
+    Application.CutCopyMode = False
+
+    Range("B59").Select
+    ActiveCell.FormulaR1C1 = _
+        "=+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",R50C1)),0,GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",R50C1))/1000-IF(ISERROR(GETPIVOTDATA(""Összeg / ""&Adatsorok!R1C,'Kieg-jut_pivot'!R3C1)),0,GETPIVOTDATA(""Összeg / ""&Ada" & _
+        "tsorok!R1C,'Kieg-jut_pivot'!R3C1))/1000/0.95+'[" & master & "]kézikorr-tábl'!R[0]C[0]" & _
+        ""
+    Range("B59").Copy
+    Range(Range("B59"), Range("B59").Offset(0, akt_ho - 1)).Select
+    ActiveSheet.Paste
+    
+
+''ok_KZS 2018.03.01
+
+End Sub
+
+Sub lelt_gyart_masol()
+'
+' Leltár és Gyártás adatok bemásolása Makró
+'
+
+'
+''meghívja a projektben definiált és beállított változókat
+Call declare_variables
+
+    Workbooks(master).Activate
+    Sheets.Add.Name = "Leltár2018"
+    Sheets("Leltár").Select
+    
+    Range("_4__Leltár[#All]").Select
+    Selection.Copy
+    Sheets("Leltár2018").Select
+    Range("A1").Select
+        Selection.PasteSpecial Paste:=xlPasteValuesAndNumberFormats, Operation:= _
+    Cells.Select
+    Cells.EntireColumn.AutoFit
+    Range("A1").Select
+    Range(Selection, Selection.End(xlToRight)).Select
+    Range(Selection, Selection.End(xlDown)).Select
+    Application.CutCopyMode = False
+    ActiveSheet.ListObjects.Add(xlSrcRange, Selection, , xlYes).Name = _
+        "Leltar"
+    Range("Leltar[#All]").Select
+    ActiveSheet.ListObjects("Leltar").TableStyle = "TableStyleMedium13"
+    Sheets("Leltár2018").Select
+    Sheets("Leltár2018").Move After:=Workbooks(fname) _
+        .Sheets("Adatsorok")
+    Windows(master).Activate
+    Sheets.Add.Name = "Gyártás2018"
+    Sheets("Gyártás2018").Select
+    With ActiveWorkbook.Sheets("Gyártás2018").Tab
+        .Color = 5296274
+        .TintAndShade = 0
+    End With
+    
+    Sheets("Gyártás").Select
+    Range("_5__Gyártás[#All]").Copy
+    Sheets("Gyártás2018").Select
+    Range("A1").Select
+        Selection.PasteSpecial Paste:=xlPasteValuesAndNumberFormats, Operation:= _
+    Cells.Select
+    Cells.EntireColumn.AutoFit
+    Range("A1").Select
+    Range(Selection, Selection.End(xlToRight)).Select
+    Range(Selection, Selection.End(xlDown)).Select
+    Application.CutCopyMode = False
+    ActiveSheet.ListObjects.Add(xlSrcRange, Selection, , xlYes).Name _
+        = "Gyartas"
+    Range("Gyartas[#All]").Select
+    ActiveSheet.ListObjects("Gyartas").TableStyle = "TableStyleMedium7"
+    Sheets("Gyártás2018").Select
+    Sheets("Gyártás2018").Move After:=Workbooks(fname _
+        ).Sheets("Adatsorok")
+
+''ok_KZS 2018.03.01
+
+End Sub
+
+Sub lelt_pivot()
+'
+' leltár pivot Makró
+'
+
+''meghívja a projektben definiált és beállított változókat
+Call declare_variables
+
+Dim lelt_p_m As String 'leltár_pivot_munkalap rövidítése
+Dim PCache As PivotCache
+Dim PT As PivotTable
+Dim lelt_p As String 'leltár_pivot tábla nevének rövidítése
+
+lelt_p_m = "leltár_pivot"
+lelt_p = "leltar_p"
+'
+    Windows(fname).Activate
+    Sheets("Leltár2018").Select
+    Range("Leltar[#All]").Select
+    Sheets.Add.Name = lelt_p_m
+    
+    Set PCache = ActiveWorkbook.PivotCaches.Create(xlDatabase, "Leltar")
+    Set PT = ActiveSheet.PivotTables.Add(PivotCache:=PCache, TableDestination:=Sheets(lelt_p_m).Range("A3"))
+    PT.Name = lelt_p
+    Sheets(lelt_p_m).Select
+    Cells(3, 1).Select
+    With PT
+        .ColumnGrand = True
+        .HasAutoFormat = True
+        .DisplayErrorString = False
+        .DisplayNullString = True
+        .EnableDrilldown = True
+        .ErrorString = ""
+        .MergeLabels = False
+        .NullString = ""
+        .PageFieldOrder = 2
+        .PageFieldWrapCount = 0
+        .PreserveFormatting = True
+        .RowGrand = True
+        .SaveData = True
+        .PrintTitles = False
+        .RepeatItemsOnEachPrintedPage = True
+        .TotalsAnnotation = False
+        .CompactRowIndent = 1
+        .InGridDropZones = False
+        .DisplayFieldCaptions = True
+        .DisplayMemberPropertyTooltips = False
+        .DisplayContextTooltips = True
+        .ShowDrillIndicators = True
+        .PrintDrillIndicators = False
+        .AllowMultipleFilters = False
+        .SortUsingCustomLists = True
+        .FieldListSortAscending = False
+        .ShowValuesRow = False
+        .CalculatedMembersInFilters = False
+        .RowAxisLayout xlCompactRow
+    End With
+    With PCache
+        .RefreshOnFileOpen = False
+        .MissingItemsLimit = xlMissingItemsDefault
+    End With
+    PT.RepeatAllLabels xlRepeatLabels
+    With PT.PivotFields("Month")
+        .Orientation = xlColumnField
+        .Position = 1
+    End With
+    With PT.PivotFields("Esemény")
+        .Orientation = xlRowField
+        .Position = 1
+    End With
+    PT.AddDataField PT.PivotFields("Nettó összeg"), "Összeg / Nettó összeg", xlSum
+    With PT.PivotFields("Összeg / Nettó összeg" _
+        )
+        .NumberFormat = "# ##0"
+    End With
+    
+''ok_KZS 2018.03.01
+    
+End Sub
+
+Sub gyartas_pivot()
+'
+' Gyártás pivot Makró
+'
+
+''meghívja a projektben definiált és beállított változókat
+Call declare_variables
+
+Dim gyart_p_m As String 'gyártás_pivot_munkalap rövidítése
+Dim PCache As PivotCache
+Dim PT As PivotTable
+Dim gyart_p As String 'gyártás_pivot tábla nevének rövidítése
+
+gyart_p_m = "gyártás_pivot"
+gyart_p = "gyartas_p"
+
+'
+    Windows(fname).Activate
+    Sheets("Gyártás2018").Select
+    Range("Gyartas").Select
+    Sheets.Add.Name = gyart_p_m
+    
+    Set PCache = ActiveWorkbook.PivotCaches.Create(xlDatabase, "Gyartas")
+    Set PT = ActiveSheet.PivotTables.Add(PivotCache:=PCache, TableDestination:=Sheets(gyart_p_m).Range("A3"))
+    PT.Name = gyart_p
+    Sheets(gyart_p_m).Select
+    Cells(3, 1).Select
+    With PT
+        .ColumnGrand = True
+        .HasAutoFormat = True
+        .DisplayErrorString = False
+        .DisplayNullString = True
+        .EnableDrilldown = True
+        .ErrorString = ""
+        .MergeLabels = False
+        .NullString = ""
+        .PageFieldOrder = 2
+        .PageFieldWrapCount = 0
+        .PreserveFormatting = True
+        .RowGrand = True
+        .SaveData = True
+        .PrintTitles = False
+        .RepeatItemsOnEachPrintedPage = True
+        .TotalsAnnotation = False
+        .CompactRowIndent = 1
+        .InGridDropZones = False
+        .DisplayFieldCaptions = True
+        .DisplayMemberPropertyTooltips = False
+        .DisplayContextTooltips = True
+        .ShowDrillIndicators = True
+        .PrintDrillIndicators = False
+        .AllowMultipleFilters = False
+        .SortUsingCustomLists = True
+        .FieldListSortAscending = False
+        .ShowValuesRow = False
+        .CalculatedMembersInFilters = False
+        .RowAxisLayout xlCompactRow
+    End With
+    With PCache
+        .RefreshOnFileOpen = False
+        .MissingItemsLimit = xlMissingItemsDefault
+    End With
+    PT.RepeatAllLabels xlRepeatLabels
+    With PT.PivotFields("Month")
+        .Orientation = xlColumnField
+        .Position = 1
+    End With
+    PT.AddDataField PT.PivotFields("Nettó összeg"), "Összeg / Nettó összeg", xlSum
+    With PT.PivotFields("Esemény")
+        .Orientation = xlRowField
+        .Position = 1
+    End With
+    With PT.PivotFields("Összeg / Nettó összeg")
+        .NumberFormat = "# ##0"
+    End With
+    
+''ok_KZS 2018.03.01
+    
+End Sub
+
+Sub lelt_gyart_keplet()
+'
+' leltár és gyártás beképletezése Makró
+'
+
+''meghívja a projektben definiált és beállított változókat
+Call declare_variables
+
+Dim kh_pivot As String
+Dim act_pivot As String
+'
+
+kh_pivot = "KH_1-" & akt_ho & "_pivot"
+act_pivot = "act_1-" & akt_ho & "_pivot"
+ 
+    Windows(fname).Activate
+    Sheets("Adatsorok").Select
+    Range("B5").Select
+    ActiveCell.FormulaR1C1 = _
+        "=+IF(ISERROR(GETPIVOTDATA(""Összeg / Költség"",'" & act_pivot & "'!R3C1,""üzletág"",R2C1,""Month"",R1C)/1000),0,GETPIVOTDATA(""Összeg / Költség"",'" & act_pivot & "'!R3C1,""üzletág"",R2C1,""Month"",R1C)/1000)+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""HM"")),0,GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C,""k" & _
+        "tsgkat"",RC1,""KH-fv"",""HM""))/1000+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""HM/GY"")*3/4),0,GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""HM/GY"")*3/4)/1000+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""GY"")/2),0,GETPI" & _
+        "VOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""GY"")/2)/1000+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""H/K"")/2),0,GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""H/K"")/2)/1000+(GETPIVOTDATA(""Nettó összeg"",gyártás_pivot!R3C1,""Esemény""," & _
+        """Szerelvény (alapanyag felhasználás)"",""Month"",R1C)-GETPIVOTDATA(""Nettó összeg"",gyártás_pivot!R3C1,""Esemény"",""Szerelvény (végtermék bevét)"",""Month"",R1C))/2000+'[" & master & "]kézikorr-tábl'!R[0]C[0]" & _
+        ""
+    Range("B5").Select
+    Selection.Copy
+    Range("B5", Range("B5").Offset(0, akt_ho - 1)).Select
+    ActiveSheet.Paste
+    Range("B21").Select
+    Application.CutCopyMode = False
+    ActiveCell.FormulaR1C1 = _
+        "=+IF(ISERROR(GETPIVOTDATA(""Összeg / Költség"",'" & act_pivot & "'!R3C1,""üzletág"",R18C1,""Month"",R1C)/1000),0,GETPIVOTDATA(""Összeg / Költség"",'" & act_pivot & "'!R3C1,""üzletág"",R18C1,""Month"",R1C)/1000)+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""KE"")),0,(GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C," & _
+        """ktsgkat"",RC1,""KH-fv"",""KE""))/1000+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""HM/GY"")/4),0,GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""HM/GY"")/4)/1000+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""H/K"")/2),0,G" & _
+        "ETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""H/K"")/2)/1000+IF(ISERROR(GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""GY"")/2),0,GETPIVOTDATA(""egyenleg2"",'" & kh_pivot & "'!R3C1,""hó"",R1C,""ktsgkat"",RC1,""KH-fv"",""GY"")/2)/1000)+(GETPIVOTDATA(""Nettó összeg"",gyártás_pivot!R3C1,""Esemény" & _
+        """,""Szerelvény (alapanyag felhasználás)"",""Month"",R1C)-GETPIVOTDATA(""Nettó összeg"",gyártás_pivot!R3C1,""Esemény"",""Szerelvény (végtermék bevét)"",""Month"",R1C))/2000+(GETPIVOTDATA(""Nettó összeg"",leltár_pivot!R3C1,""Esemény"",""Leltárhiány"",""Month"",R1C)-GETPIVOTDATA(""Nettó összeg"",leltár_pivot!R3C1,""Esemény"",""Leltártöbblet"",""Month"",R1C))/1000+'[" & master & "]kézikorr-tábl'!R[0]C[0]" & _
+        ""
+    Range("B21").Select
+    Selection.Copy
+    Range("B21", Range("B21").Offset(0, akt_ho - 1)).Select
+    ActiveSheet.Paste
+    
+''ok_KZS 2018.03.01
+    
+End Sub
+
+
+Sub extrapol()
+'
+' extrapolál Makró
+'
+
+''meghívja a projektben definiált és beállított változókat
+Call declare_variables
+
+'
+    Windows(fname).Activate
+    Sheets("Adatsorok").Select
+    Range("B3").Offset(0, akt_ho).Select
+    ActiveCell.FormulaR1C1 = "=+AVERAGE(RC[-" & akt_ho & "]:RC[-1])"
+    Range("B3").Offset(0, akt_ho).Select
+    Selection.Copy
+    Range("B5:B11").Offset(0, akt_ho).Select
+    ActiveSheet.Paste
+    Range("B19").Offset(0, akt_ho).Select
+    ActiveSheet.Paste
+    Range("B21:B27").Offset(0, akt_ho).Select
+    ActiveSheet.Paste
+
+    Range("B37:B43").Offset(0, akt_ho).Select
+    ActiveSheet.Paste
+    Range("B53:B59").Offset(0, akt_ho).Select
+    ActiveSheet.Paste
+
+    Range("B3").Offset(0, akt_ho).Select
+    Application.CutCopyMode = False
+    Selection.Copy
+    Selection.PasteSpecial Paste:=xlPasteValuesAndNumberFormats, Operation:= _
+        xlNone, SkipBlanks:=False, Transpose:=False
+    Application.CutCopyMode = False
+    Selection.AutoFill Destination:=Range(Selection, "M3"), Type:=xlFillDefault
+    Range("B5:B11").Offset(0, akt_ho).Select
+    Selection.Copy
+    Selection.PasteSpecial Paste:=xlPasteValuesAndNumberFormats, Operation:= _
+        xlNone, SkipBlanks:=False, Transpose:=False
+    Application.CutCopyMode = False
+    Range("B5").Offset(0, akt_ho).Select
+    Selection.AutoFill Destination:=Range(Selection, "M11"), Type:=xlFillDefault
+
+    Range("B19").Offset(0, akt_ho).Select
+    Selection.Copy
+    Range(Selection, "M19").Select
+    ActiveSheet.Paste
+    Range("B19").Offset(0, akt_ho).Select
+    Application.CutCopyMode = False
+    Selection.Copy
+    Selection.PasteSpecial Paste:=xlPasteValuesAndNumberFormats, Operation:= _
+        xlNone, SkipBlanks:=False, Transpose:=False
+    Application.CutCopyMode = False
+    Range("B19").Offset(0, akt_ho).Select
+    Selection.AutoFill Destination:=Range(Selection, "M19"), Type:=xlFillDefault
+
+    Range("B21:B27").Offset(0, akt_ho).Select
+    Selection.Copy
+    Selection.PasteSpecial Paste:=xlPasteValuesAndNumberFormats, Operation:= _
+        xlNone, SkipBlanks:=False, Transpose:=False
+    Application.CutCopyMode = False
+    Range("B21:B27").Offset(0, akt_ho).Select
+    Selection.AutoFill Destination:=Range(Selection, "M27"), Type:=xlFillDefault
+
+    Range("B37:B43").Offset(0, akt_ho).Select
+    Selection.Copy
+    Selection.PasteSpecial Paste:=xlPasteValuesAndNumberFormats, Operation:= _
+        xlNone, SkipBlanks:=False, Transpose:=False
+    Application.CutCopyMode = False
+       Range("B37:B43").Offset(0, akt_ho).Select
+    Selection.AutoFill Destination:=Range(Selection, "M43"), Type:=xlFillDefault
+
+    Range("B43").Offset(0, akt_ho).Select
+    Selection.Copy
+    Selection.PasteSpecial Paste:=xlPasteValuesAndNumberFormats, Operation:= _
+        xlNone, SkipBlanks:=False, Transpose:=False
+    Range("B3:B59").Offset(0, akt_ho).Select
+    Application.CutCopyMode = False
+    Selection.Copy
+    Selection.PasteSpecial Paste:=xlPasteValuesAndNumberFormats, Operation:= _
+        xlNone, SkipBlanks:=False, Transpose:=False
+    Application.CutCopyMode = False
+        Range("B3:B59").Offset(0, akt_ho).Select
+    Selection.AutoFill Destination:=Range(Selection, "M59"), Type:=xlFillDefault
+
+    Range("B1").Offset(0, akt_ho).Select
+    Range(Selection, "M1").Select
+    With Selection.Interior
+        .Pattern = xlSolid
+        .PatternColorIndex = xlAutomatic
+        .ThemeColor = xlThemeColorLight2
+        .TintAndShade = 0.599993896298105
+        .PatternTintAndShade = 0
+    End With
+    
+''ok_KZS 2018.03.01
+    
+End Sub
+
+Sub fulek_elrejt()
+'
+' felesleges fülek elrejtése Makró
+'
+
+''meghívja a projektben definiált és beállított változókat
+Call declare_variables
+
+'
+    Windows(fname).Activate
+    Sheets(Array("Adatsorok-kum", "kieg-jut_pivot", "Kieg-jut", "Adatsorok", _
+        "gyártás_pivot", "Gyártás2018", "leltár_pivot", "Leltár2018", "berszorzo", _
+        "ber_1-" & akt_ho & "_pivot", th_berl_mlap, "KH_1-" & akt_ho & "_pivot", "act_1-" & akt_ho & "_pivot", _
+        KH_58, "Actual_1-" & akt_ho & "_m", "HR-adatsorok", "Alapadatok")).Select
+    ActiveWindow.SelectedSheets.Visible = False
+    Sheets("Jelentés főlap").Select
+    ActiveWorkbook.Save
+    
+''ok_KZS 2018.03.01
+    
+End Sub
+
+
+
+Sub alapadatok_atir()
+
+Call declare_variables
+
+    Windows(fname).Activate
+    Sheets("Alapadatok").Visible = True
+    Sheets("Alapadatok").Range("t_idoszak").Value = Workbooks(master).Sheets(master_ful).Range("idoszak").Value
+    Sheets("Alapadatok").Range("t_aktho").Value = Workbooks(master).Sheets(master_ful).Range("aktho").Value
+    
+    
+End Sub
+
