@@ -1,0 +1,37 @@
+Sub a2_kh58_rendez()
+'
+' bemásolja az egyeztetendő fájlból a lerendezett kartont a MASTER-fájlba, majd az AA-oszlopba megcsinálja a Költségkategorizálást
+'
+
+
+Call turbo_be
+
+''meghívja a projektben definiált és beállított változókat
+Call declare_variables
+
+'
+    Windows(egyfajlnev).Activate
+    Sheets(KH_58).Select
+    Sheets(KH_58).Copy Before:=Workbooks(master).Sheets(3)
+    Sheets(KH_58).Select
+    With ActiveWorkbook.Sheets(KH_58).Tab
+        .Color = 5296274
+        .TintAndShade = 0
+    End With
+    Columns("AA:AA").Select
+    Selection.Insert Shift:=xlToRight, CopyOrigin:=xlFormatFromLeftOrAbove
+    Range("karton58[[#Headers],[egyenleg3]]").Select
+    ActiveCell.FormulaR1C1 = "ktsgkat"
+    Range("AA2").Select
+    ActiveCell.FormulaR1C1 = _
+        "=+VLOOKUP([@fsz],Ktsg_kateg[[#All],[fsz]:[költség kategória]],2,FALSE)"
+    Range("AA3").Select
+    
+    
+Call turbo_ki
+
+''ok_KZS 2018.02.28
+
+End Sub
+
+
