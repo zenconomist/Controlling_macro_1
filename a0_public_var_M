@@ -1,0 +1,109 @@
+Public master As String
+Public master_utv As String
+Public master_ful As String
+Public cegnev As String
+
+Public idoszak As String
+Public elozoidoszak As String
+Public akt_ho As String
+Public targyho_mappa As String
+Public egyfajlnev As String
+Public th_ufka As String
+Public th_koka As String
+Public th_karton As String
+Public th_fk As String
+Public th_berl As String
+Public th_eszk As String
+Public egyezt_mappa As String
+Public egyeztetett As String
+Public th_berl_mlap As String
+Public th_fk_mlap As String
+
+Public ml_58 As String
+Public kh_munkalap As String
+Public KH58_pivot As String
+Public KH_tablazat As String
+Public karton_tabl As String
+
+Public ml_5_8 As String
+Public tabl_58 As String
+
+Public tablazat_act As String
+Public munkalap2 As String
+Public template As String
+Public tablazat_act2 As String
+Public fname As String
+Public KH_58 As String
+Public tablazat_kh As String
+
+Public act_munkalap As String
+Public act_pivot As String
+Public act_tablazat As String
+Public ber_pivot_m As String
+Public ber_pivot_k As String
+
+Public kieg_jut_fn As String
+
+Public pr_mappa As String
+Public prfajl As String
+
+Sub declare_variables()
+
+    master = "MASTER_Chemplex.xlsm"
+    master_utv = "C:\Users\Zsolt\Google Drive\01_ZC\01_ZC\01_ZC ÜF\Ch\W\18\MASTER"
+    master_ful = "MASTER"
+    cegnev = Workbooks(master).Sheets(master_ful).Range("cegnev").Value
+    idoszak = Workbooks(master).Sheets(master_ful).Range("idoszak").Value
+    elozoidoszak = Workbooks(master).Sheets(master_ful).Range("elozoidoszak").Value
+    akt_ho = Workbooks(master).Sheets(master_ful).Range("aktho").Value
+    targyho_mappa = Workbooks(master).Sheets(master_ful).Range("th_mappa").Value
+    egyfajlnev = Workbooks(master).Sheets(master_ful).Range("egyfajlnev").Value
+    th_ufka = Workbooks(master).Sheets(master_ful).Range("th_ufka").Value
+    th_koka = Workbooks(master).Sheets(master_ful).Range("th_koka").Value
+    th_karton = Workbooks(master).Sheets(master_ful).Range("th_karton").Value
+    th_fk = Workbooks(master).Sheets(master_ful).Range("th_fk").Value
+    th_berl = Workbooks(master).Sheets(master_ful).Range("th_berl").Value
+    th_eszk = Workbooks(master).Sheets(master_ful).Range("th_eszkl").Value
+    egyezt_mappa = Workbooks(master).Sheets(master_ful).Range("egyezt_mappa").Value
+    egyeztetett = Workbooks(master).Sheets(master_ful).Range("egyeztetett").Value
+    th_berl_mlap = Workbooks(master).Sheets(master_ful).Range("th_berl_mlap").Value
+    th_fk_mlap = Workbooks(master).Sheets(master_ful).Range("th_fk_mlap").Value
+    karton_tabl = "kartonok"
+    ml_5_8 = "KH_5-8"
+    tabl_58 = "karton58"
+    template = Workbooks("MASTER_Chemplex.xlsm").Sheets("MASTER").Range("template").Value
+    tablazat_act = "Actual_" & akt_ho
+    munkalap2 = "Actual_1-" & akt_ho & "_m"
+    fname = "Jelentés_Chemplex_2018_1-" & akt_ho & ".xlsx"
+    tablazat_act2 = "Actual_2018_" & akt_ho
+    KH_58 = "KH_5-8"
+    tablazat_kh = "KH_58_" & akt_ho & "ho"
+    act_pivot = "act_kimut"
+    act_munkalap = "act_1-" & akt_ho & "_pivot"
+    KH58_pivot = "KH58_kimut"
+    kh_munkalap = "KH_1-" & akt_ho & "_pivot"
+    KH_tablazat = "karton58"
+    ber_pivot_m = "ber_1-" & akt_ho & "_pivot"
+    ber_pivot_k = "ber_pivot"
+    kieg_jut_fn = Workbooks(master).Sheets(master_ful).Range("kieg_jut_fn").Value
+    prfajl = "Projektelszám_2018_" & akt_ho & "ho.xlsx"
+    pr_mappa = Workbooks(master).Sheets(master_ful).Range("elszam_utv").Value
+
+End Sub
+
+Sub turbo_be()
+    With Application
+        .ScreenUpdating = False
+        .Calculation = xlCalculationManual
+        .EnableEvents = False
+    End With
+End Sub
+
+Sub turbo_ki()
+    With Application
+        .ScreenUpdating = True
+        .Calculation = xlCalculationAutomatic
+        .EnableEvents = True
+    End With
+End Sub
+
