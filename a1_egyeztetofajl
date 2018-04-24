@@ -1,0 +1,172 @@
+Sub a1_foprog_egyezteto_fajl() 'Egyeztető fájl létrehoz
+
+''meghívja a projektben definiált és beállított változókat
+Call declare_variables
+
+
+    Application.DisplayAlerts = False
+    Application.AskToUpdateLinks = False
+    
+
+    Call turbo_be
+        'ide illeszthetőek a főprogram további részei
+  
+        Call karton_formaz
+        Call egyfajl_letrehoz
+        Call karton_58
+        Call KH_fv_589
+    
+    Call turbo_ki
+    
+    Application.DisplayAlerts = True
+    Application.AskToUpdateLinks = True
+
+
+End Sub
+
+Sub karton_formaz()
+'
+' karton_formázás Makró
+'
+
+''meghívja a projektben definiált és beállított változókat
+Call declare_variables
+        
+''megnyitja a kapott kartont, és a kapott főkönyvet
+    Workbooks.Open Filename:= _
+                th_koka & "\" & th_karton
+        
+    Workbooks.Open Filename:= _
+                th_koka & "\" & th_fk
+                
+
+    Windows(th_karton).Activate
+    Range("A1").Select
+    
+    Range(Selection, Selection.End(xlToRight)).Select
+    Range(Selection, Selection.End(xlDown)).Select
+    Application.CutCopyMode = False
+    ActiveSheet.ListObjects.Add(xlSrcRange, Selection, , xlYes).Name = _
+        karton_tabl
+    ActiveSheet.ListObjects(karton_tabl).TableStyle = "TableStyleMedium4"
+    Range("V1").Select
+    ActiveCell.FormulaR1C1 = "fk_megnev"
+    Range("V2").Select
+    ActiveCell.FormulaR1C1 = _
+        "=+VLOOKUP(RC[-15],[" & th_fk & "]" & th_fk_mlap & "!C1:C2,2,FALSE)"
+        
+    Range("W1").Select
+    ActiveCell.FormulaR1C1 = "fsz1"
+    Range("W2").Select
+    ActiveCell.FormulaR1C1 = "=+LEFT(RC[-16])"
+    Range("X1").Select
+    ActiveCell.FormulaR1C1 = "év"
+    Range("X2").Select
+    Application.CutCopyMode = False
+    ActiveCell.FormulaR1C1 = "=+YEAR(RC[-21])"
+    Range("Y1").Select
+    ActiveCell.FormulaR1C1 = "hó"
+    Range("Y2").Select
+    Application.CutCopyMode = False
+    ActiveCell.FormulaR1C1 = "=+MONTH(RC[-22])"
+    Range("Z1").Select
+    ActiveCell.FormulaR1C1 = "egyenleg2"
+    Range("Z2").Select
+    Application.CutCopyMode = False
+    ActiveCell.FormulaR1C1 = "=+RC[-16]-RC[-15]"
+    Columns("Z:Z").Select
+    Selection.NumberFormat = "#,##0"
+    Range("Z1").Select
+    Selection.End(xlToLeft).Select
+
+''ok KZS 2018.02.27
+
+End Sub
+
+Sub egyfajl_letrehoz()
+'
+' egyfajl_letrehoz Makró
+'
+
+''meghívja a projektben definiált és beállított változókat
+Call declare_variables
+ 
+    Workbooks.Add
+    ChDir _
+        targyho_mappa
+    ActiveWorkbook.SaveAs Filename:= _
+        targyho_mappa & "\" & egyfajlnev _
+        , FileFormat:=xlOpenXMLWorkbook, CreateBackup:=False
+
+
+''ok_KZS 2018.02.27
+
+End Sub
+
+
+Sub karton_58()
+'
+' karton_58 Makró
+'
+
+'
+
+''meghívja a projektben definiált és beállított változókat
+Call declare_variables
+
+    Windows(th_karton).Activate
+    ActiveSheet.ListObjects(karton_tabl).Range.AutoFilter Field:=23, Criteria1:= _
+        Array("5", "8"), Operator:=xlFilterValues
+    Range("A1").CurrentRegion.Select
+
+    Selection.Copy
+    Sheets.Add.Name = ml_5_8
+    Sheets(ml_5_8).Select
+    ActiveSheet.Paste
+    
+    Application.CutCopyMode = False
+    ActiveSheet.ListObjects.Add(xlSrcRange, Selection, , xlYes).Name = _
+        tabl_58
+        
+    ActiveSheet.ListObjects(tabl_58).TableStyle = "TableStyleMedium4"
+
+    Windows(th_karton).Activate
+    Sheets(ml_5_8).Select
+    Sheets(ml_5_8).Copy Before:=Workbooks(egyfajlnev _
+        ).Sheets(1)
+    Sheets("Munka1").Select
+    ActiveWindow.SelectedSheets.Delete
+
+
+''ok_KZS 2018.02.27
+
+End Sub
+
+Sub KH_fv_589()
+'
+' KH_fv_589 Makró
+'
+
+''meghívja a projektben definiált és beállított változókat
+Call declare_variables
+    
+    Windows(egyfajlnev).Activate
+    Sheets(ml_5_8).Select
+    Range(tabl_58 & "[[#Headers],[naplosorsz]]").Select
+    Selection.End(xlToRight).Select
+    Range("AA1").Select
+    ActiveCell.FormulaR1C1 = "KH-fv"
+    Range("AA2").Select
+'    Application.FormulaBarHeight = 9
+ActiveCell.FormulaR1C1 = _
+        "=+IF(OR([@msz]=""HM"",[@msz]=""HMŰ""),""HM"",IF([@msz]="""",IF(ISERROR(VLOOKUP([@hivatkozas]," & master & "!KH_ktg_tetel[[#All],[hivatkozas]:[Nikolett]],28,FALSE)),IF(ISERROR(VLOOKUP([@partkod]," & master & "!KH_szall[#All],5,FALSE)),IF(ISERROR(VLOOKUP([@partnev]," & master & "!KH_szall[[#All],[partnev]:[végleges KH]],4,FALSE)),IF(IS" & _
+        "ERROR(VLOOKUP([@fsz]," & master & "!KH_fok[#All],3,FALSE)),""ismeretlen"",VLOOKUP([@fsz]," & master & "!KH_fok[#All],3,FALSE)),VLOOKUP([@partnev]," & master & "!KH_szall[[#All],[partnev]:[végleges KH]],4,FALSE)),VLOOKUP([@partkod]," & master & "!KH_szall[#All],5,FALSE)),VLOOKUP([@hivatkozas]," & master & "!KH_kt" & _
+        "g_tetel[[#All],[hivatkozas]:[Nikolett]],28,FALSE)),""KE""))" & _
+        ""
+    Range("AA3").Select
+    
+''ok_KZS 2018.02.27
+
+End Sub
+
+
